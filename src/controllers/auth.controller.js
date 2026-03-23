@@ -376,6 +376,19 @@ export async function verifyEmail(req, res) {
     });
   }
 
+  //  expiration check
+  const currentTime = new Date();
+  const otpAgeInMinutes = (currentTime - otpData.createdAt) / (1000 * 60);
+
+  if (otpAgeInMinutes > 5) {
+    await Otp.deleteMany({ user: otpData.user });
+    
+    return res.status(400).json({
+      success: false,
+      message: "OTP has expired. Please request a new one.",
+    });
+  }
+
   const user = await User.findByIdAndUpdate(
     otpData.user,
     { $set: { verified: true } },
@@ -392,6 +405,8 @@ export async function verifyEmail(req, res) {
     //     { new: true },
   );
 
+
+
   await Otp.deleteMany({
     user: otpData.user,
   });
@@ -405,4 +420,45 @@ export async function verifyEmail(req, res) {
       verified: user.verified,
     },
   });
+}
+
+export async function resendOtp(req,res){
+   const { email } = req.body;
+
+   const user=await User.findOne({email});
+
+   if(!user){
+    return res.status(404).json({
+      success: false,
+      message: "User not found with this email",
+    });
+   }
+
+   if (user.verified) {
+    return res.status(400).json({
+      success: false,
+      message: "User is already verified. Please login.",
+    });
+  }
+
+  //  Delete any existing OTPs for this user to prevent confusion/spam
+  await Otp.deleteMany({ user: user._id });
+
+  const otp = generateOTP();
+  const html = getOTPHtml(otp, user.userName);
+  const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
+
+  await Otp.create({
+    email,
+    user: user._id,
+    otpHash,
+  });
+
+  await sendEmail(email, "New OTP Verification", `Your new OTP is ${otp}`, html);
+
+  return res.status(200).json({
+    success: true,
+    message: "A fresh OTP has been sent to your email",
+  });
+
 }

@@ -15,6 +15,8 @@ authRouter.post("/login",authController.login);
 
 authRouter.get("/getMe",authController.getMe);
 
-authRouter.get("/verify-email",authController.verifyEmail);
+authRouter.post("/verify-email",authController.verifyEmail);
+
+authRouter.post("/resend-otp",authController.resendOtp);
 
 export default authRouter;
